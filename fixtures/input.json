@@ -1,0 +1,13 @@
+{
+  "ppq": 480, "end_tick": 1440,
+  "tempos": [{"tick": 0, "microseconds_per_quarter": 500000}, {"tick": 480, "microseconds_per_quarter": 1000000}],
+  "events": [
+    {"id": "n1", "tick": 0, "channel": 0, "kind": "on", "pitch": 60, "velocity": 90},
+    {"id": "p1", "tick": 120, "channel": 0, "kind": "pedal", "down": true},
+    {"id": "r1", "tick": 240, "channel": 0, "kind": "off", "pitch": 60},
+    {"id": "n2", "tick": 480, "channel": 0, "kind": "on", "pitch": 64, "velocity": 80},
+    {"id": "r2", "tick": 720, "channel": 0, "kind": "off", "pitch": 64},
+    {"id": "p2", "tick": 960, "channel": 0, "kind": "pedal", "down": false},
+    {"id": "n3", "tick": 960, "channel": 0, "kind": "on", "pitch": 67, "velocity": 70}
+  ]
+}
