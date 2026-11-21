@@ -17,9 +17,10 @@ uv pip install --offline --python .venv/bin/python --no-build-isolation --no-dep
 uv pip check --python .venv/bin/python
 .venv/bin/python -I -m unittest discover -s tests -v
 .venv/bin/pedal-performance --source fixtures/input.json --output run/report-initial.json
+.venv/bin/pedal-performance --source fixtures/input-score.json --output run/report-score.json
 ```
 
-实际6项测试通过；CLI演示生成JSON，摘要为：
+实际32项测试通过；CLI演示生成JSON，摘要为：
 
 ```json
 {
@@ -30,7 +31,28 @@ uv pip check --python .venv/bin/python
 }
 ```
 
+带乐谱样例 `fixtures/input-score.json` 的摘要额外包含评估计数（共10项）：
+
+```json
+{
+  "peak_polyphony": 2,
+  "pedal_extended_voices": 2,
+  "unfinished_keys": 2,
+  "voices": 4,
+  "matched_cues": 3,
+  "missed_cues": 1,
+  "extra_voices": 1,
+  "onset_ok": 2,
+  "duration_ok": 2,
+  "duration_undetermined": 1
+}
+```
+
 输出是原子新建；演示已生成过的同名路径不能重用，复跑请换一个新文件名。非法输入与文件写入错误退出2；业务诊断的表达方式见契约。已经实际核验重复JSON键拒绝、旧结果字节不变、已有符号链接不覆盖。
+
+## 乐谱提示评估
+
+可选 `score` 给出 cues；每个 cue 按 channel/pitch 与声部做保序一对一归因，报告起音偏差/状态、按键时值偏差/状态、漏奏与多奏。归因依次最大化匹配数、最小化起音绝对偏差总和、最小化可观测按键时值绝对偏差总和，再取配对序列字典序最小者。两套 ppq/速度图各自积分，比较全程用整数缩放后的精确值。未释放按键的时值标为不可判定，不以踏板延音或 end_tick 强停冒充释放。字段与边界见契约。
 
 ## 当前边界
 

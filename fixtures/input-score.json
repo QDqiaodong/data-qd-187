@@ -1,0 +1,28 @@
+{
+  "ppq": 480, "end_tick": 1440,
+  "tempos": [{"tick": 0, "microseconds_per_quarter": 500000}, {"tick": 480, "microseconds_per_quarter": 1000000}],
+  "events": [
+    {"id": "n1", "tick": 0, "channel": 0, "kind": "on", "pitch": 60, "velocity": 90},
+    {"id": "p1", "tick": 120, "channel": 0, "kind": "pedal", "down": true},
+    {"id": "r1", "tick": 240, "channel": 0, "kind": "off", "pitch": 60},
+    {"id": "n2", "tick": 480, "channel": 0, "kind": "on", "pitch": 64, "velocity": 80},
+    {"id": "r2", "tick": 720, "channel": 0, "kind": "off", "pitch": 64},
+    {"id": "p2", "tick": 960, "channel": 0, "kind": "pedal", "down": false},
+    {"id": "n3", "tick": 960, "channel": 0, "kind": "on", "pitch": 67, "velocity": 70},
+    {"id": "n4", "tick": 1200, "channel": 0, "kind": "on", "pitch": 72, "velocity": 65}
+  ],
+  "score": {
+    "ppq": 960, "end_tick": 4800,
+    "tempos": [{"tick": 0, "microseconds_per_quarter": 250000}, {"tick": 960, "microseconds_per_quarter": 500000}],
+    "cues": [
+      {"cue_id": "c1", "channel": 0, "pitch": 60, "start_tick": 0, "release_tick": 960,
+       "onset_tolerance_us": 20000, "duration_tolerance_us": 20000},
+      {"cue_id": "c2", "channel": 0, "pitch": 64, "start_tick": 1440, "release_tick": 2400,
+       "onset_tolerance_us": 20000, "duration_tolerance_us": 20000},
+      {"cue_id": "c3", "channel": 0, "pitch": 67, "start_tick": 2880, "release_tick": 3840,
+       "onset_tolerance_us": 20000, "duration_tolerance_us": 20000},
+      {"cue_id": "c4", "channel": 0, "pitch": 69, "start_tick": 4320, "release_tick": 4800,
+       "onset_tolerance_us": 20000, "duration_tolerance_us": 20000}
+    ]
+  }
+}
