@@ -26,3 +26,19 @@ events最多10000条，id全局唯一，按非递减tick输入；同tick按列�
 
 score 无效、演奏无效或评估无法完成时整份报告不发布，退出 2；不得留下部分报告。输出仍只原子新建，不覆盖已有目标。
 
+# 多录次剪辑 v1（--comp）
+
+`pedal-performance --comp MANIFEST --output RESULT` 与 `--source` 互斥，必须且只能给一个；旧模式的报告、可选乐谱评估与退出行为不变。清单与结果均为 UTF-8 JSON，沿用严格读取（重复键、非有限常量、超 8 MB 拒绝）与原子新建发布。
+
+清单顶层恰含 `cuts`、`takes`、`min_duration_us`、`max_duration_us`、`max_switches`。`takes` 1..4 份，每份恰含 `take_id`（标识符格式，清单内唯一）、`performance`、`section_costs`。`performance` 使用演奏 v1 的四个必填字段，不带 `score`；各录次 ppq 与 end_tick 必须相同，速度图可不同；事件 ID 只在本录次内唯一。每份录次沿用单录次校验与事件因果规则；任何录次出现无法匹配的 off，整份清单无效，即使该录次未被选用。全部录次合计最多 8000 条事件、980 个速度点。
+
+`cuts` 为严格递增整数 tick 序列，从 0 到共有的 end_tick，划出 1..12 个相邻段；每段含左端 tick、不含右端 tick，最后一段额外包含 end_tick 上的事件。`section_costs` 长度等于段数，每项为 0..10⁹ 整数或 null（该录次此段被弃用）。`min_duration_us`、`max_duration_us` 为 0..6×10¹⁴ 整数，上限不小于下限，区间含两端。`max_switches` 为 0..段数−1 的整数。字段缺失、额外字段、类型或范围错误均使整份清单无效，退出 2，不发布结果。
+
+`cut_diagnostics` 按切点再按 take_id 排列，覆盖每个内部切点（不含 0 与 end_tick）与每个录次：`held_voice_ids`（仍按键声部）、`sustained_voice_ids`（已松键仍在踏板延音声部）、`pedal_down_channels`（踩下踏板的通道），分别按 ID 或通道排序。状态取自即将处理该 tick 首个事件之前：切点上的事件尚未生效，后续事件与 end_tick 强制止音也不会提前消除活跃声部；没有恰落在该 tick 的事件时同样给出状态。
+
+计划按顺序为每段选一个代价非 null 的录次。相邻段同录次直接保持因果连续；换录次仅当两个录次在该切点都没有仍按键或仍延音的声部才允许，单纯踏板踩下不阻止。换录次数不超过 `max_switches`。每段时长是所选录次速度图在该段左右端之间的精确积分（无事件的段同样计时），总时长为各段精确和，不先舍入，须落在时长区间内。可行计划中依次最小化总代价、换录次数、按段排列的 take_id 序列字典序；结果与录次在清单中的排列无关。
+
+输出恰含 `status`、`cut_diagnostics`、`plan`、`performance`、`event_origins`、`report`。有解时 `status` 为 `ok`：`plan` 含各段 `start_tick`、`end_tick`、`take_id`、`cost`、`duration_us`，以及 `total_cost`、`total_duration_us`、`switches`；精确时长沿用整数或最简分数字符串。无解时 `status` 为 `no_plan`，诊断照常发布，其余四项为 null，退出 0。
+
+`performance` 可直接作为旧命令的 `--source`，保持共有 tick 坐标。速度图输出 tick 0 的速度与此后会影响播放时长的速度变化：段内沿用所选录次实际生效的速度，段首 tick 以右侧所选录次为准。所选段的原事件全部保留，同 tick 继承输入顺序；事件 ID 重新分配为 `e0`、`e1`、… 的全局唯一标识符，可重复生成。换录次时，对两侧切点前踏板状态不同的每个通道补一条踏板事件，调到进入录次的切点前状态；补发事件按通道升序放在切点 tick，先于选中录次在该 tick 的全部原事件；不补发按键事件。`event_origins` 按输出顺序逐条对应：`output_id`、原 `take_id`、原 `event_id`、`patched`；补发踏板另标 `tick`、`channel`，两项原身份为 null。`report` 等于旧模式处理该合成 `performance` 的完整报告，其 `duration_us` 等于计划总时长。
+

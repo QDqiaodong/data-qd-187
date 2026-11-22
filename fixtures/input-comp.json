@@ -1,0 +1,34 @@
+{
+  "cuts": [0, 480, 960],
+  "takes": [
+    {
+      "take_id": "take-a",
+      "performance": {
+        "ppq": 480, "end_tick": 960,
+        "tempos": [{"tick": 0, "microseconds_per_quarter": 500000}],
+        "events": [
+          {"id": "p1", "tick": 0, "channel": 0, "kind": "pedal", "down": true},
+          {"id": "n1", "tick": 0, "channel": 0, "kind": "on", "pitch": 60, "velocity": 90},
+          {"id": "r1", "tick": 240, "channel": 0, "kind": "off", "pitch": 60},
+          {"id": "p2", "tick": 400, "channel": 0, "kind": "pedal", "down": false}
+        ]
+      },
+      "section_costs": [3, null]
+    },
+    {
+      "take_id": "take-b",
+      "performance": {
+        "ppq": 480, "end_tick": 960,
+        "tempos": [{"tick": 0, "microseconds_per_quarter": 500000}],
+        "events": [
+          {"id": "n2", "tick": 480, "channel": 0, "kind": "on", "pitch": 64, "velocity": 80},
+          {"id": "r2", "tick": 720, "channel": 0, "kind": "off", "pitch": 64}
+        ]
+      },
+      "section_costs": [null, 2]
+    }
+  ],
+  "min_duration_us": 0,
+  "max_duration_us": 600000000000000,
+  "max_switches": 1
+}
