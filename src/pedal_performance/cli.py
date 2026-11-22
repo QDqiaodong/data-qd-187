@@ -4,6 +4,7 @@ import sys
 from .audit import audit_capture
 from .comp import compose
 from .io import load, publish
+from .keyonly import export_key_only
 from .service import process
 from .settlement import settle
 
@@ -14,6 +15,7 @@ def main(argv=None):
     modes.add_argument('--comp')
     modes.add_argument('--capture-audit')
     modes.add_argument('--settlement')
+    modes.add_argument('--key-only')
     parser.add_argument('--previous')
     parser.add_argument('--output', required=True)
     args = parser.parse_args(argv)
@@ -26,6 +28,14 @@ def main(argv=None):
             summary = {'status': result['status'],
                        'total_cents': result['total_cents'],
                        'adjustments': len(result['adjustments'])}
+        elif args.key_only is not None:
+            result = export_key_only(load(args.key_only))
+            summary = {'status': result['status'],
+                       'demands': len(result['demands']),
+                       'omitted_zero_voices': len(result['omitted_zero_voice_ids'])}
+            if result['status'] == 'ok':
+                summary.update(total_load_cost=result['total_load_cost'],
+                               voices=len(result['voice_routes']))
         elif args.capture_audit is not None:
             result = audit_capture(load(args.capture_audit))
             summary = {'status': result['status'], 'channels': len(result['channels'])}

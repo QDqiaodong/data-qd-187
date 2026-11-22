@@ -21,7 +21,7 @@ uv pip check --python .venv/bin/python
 .venv/bin/pedal-performance --comp fixtures/input-comp.json --output run/report-comp.json
 ```
 
-实际98项测试通过；CLI演示生成JSON，摘要为：
+实际123项测试通过；CLI演示生成JSON，摘要为：
 
 ```json
 {
@@ -84,7 +84,7 @@ uv pip check --python .venv/bin/python
 
 ## 离线用量结算
 
-`--settlement BATCH --output RESULT` 按录次给音轨供稿人结算发声费。首批出账；续批加 `--previous PREVIOUS_RESULT`，只开相对已入账结果的差额。`--previous` 仅可用于本模式，与其余三种模式互斥。
+`--settlement BATCH --output RESULT` 按录次给音轨供稿人结算发声费。首批出账；续批加 `--previous PREVIOUS_RESULT`，只开相对已入账结果的差额。`--previous` 仅可用于本模式，与其余四种模式互斥。
 
 对一份录次的每个声部按其自身速度图精确积分半开区间的发声时长；同一时刻多位供稿人发声则平分，同一人多个声部或通道仍只占一份。音量、按键时长与峰值复音都不参与计费。所有录次的精确用量先按供稿人求和，再对整个项目做一次整数分下取整与尾分分配，绝不按录次分别舍入。批次用 `upsert` 整份替换一个录次的演奏与通道归属，用 `withdraw` 撤下仍在该录次（保留身份，可后续恢复）。同一 `batch_id` 相同内容重放返回 `replayed` 且不再入账，不同内容冲突。`checkpoint` 保存派生用量与已入账累计额，使旧事件文件离线归档后仍能继续结算。
 
@@ -98,6 +98,24 @@ uv pip check --python .venv/bin/python
 ```
 
 首批用量为 `a` 0.5 秒、`b` 0.75 秒、`c` 0.25 秒，项目只有一分归 `b`；第二批只提交录次甲的新版本（`b` 在 0.5 秒止音），项目精确总额不变但三人小数余数相同，唯一一分改归 `a`，差额为 `b` -1、`a` +1。字段、边界与衔接规则见契约。
+
+## 按键版导出
+
+`--key-only MANIFEST --output RESULT` 与其余模式互斥，面向不认踏板、同一音高在一轨上同时至多一键发声的按键消息教学终端。它把踏板决定的实际发声时长烘焙进普通 on/off 消息，并按每轨预先装载的音色及装载开销，选出能完整播放整份录次的最低代价配置。
+
+清单顶层恰含 `performance`、`channel_programs`、`lanes`。`channel_programs` 把源通道映射到音色（有 on 的通道必须有映射），`lanes` 给出每轨可装音色及其代价。先按旧语义求每个声部的 `[起音, 实际止音)`；某音色需要的轨数 `min_lanes` 由所有映射到它的源通道合并后同音高区间的最大重叠决定，重叠的不同音高不额外占轨。设备规划要求每种音色恰好得到 `min_lanes` 条轨，在能完整导出的配置中按总装载代价、再按轨号升序的音色序列字典序取最小；配置确定后按（起音、声部 ID）取字典序最小的轨号编排。零时长声部登记但不播放。输出 `demands`、`omitted_zero_voice_ids`、`configuration`、`total_load_cost`、`voice_routes`，以及可直接交给旧 `--source` 的四字段 `performance`（无踏板事件，同 tick 先 off 后 on，同一键可在止音点立即重起）。设备放不下时发布带 `demands` 的 `no_layout`，其余四项为 null；输入错误退出 2。字段与规则细节见契约。
+
+演示 `fixtures/input-keyonly.json`：音色 `P` 的同音高在轨上重叠、`Q` 只在轨 0 可装，摘要为：
+
+```json
+{
+  "status": "ok",
+  "demands": 2,
+  "omitted_zero_voices": 0,
+  "total_load_cost": 9,
+  "voices": 3
+}
+```
 
 ## 当前边界
 

@@ -59,7 +59,7 @@ score 无效、演奏无效或评估无法完成时整份报告不发布，退�
 
 # 离线用量结算 v1（--settlement）
 
-`pedal-performance --settlement BATCH --output RESULT` 首次出账；续批用 `pedal-performance --settlement BATCH --previous PREVIOUS_RESULT --output RESULT`。`--previous` 仅可用于本模式；四种模式互斥。一次结算服务同一素材项目，费用用整数分记账，不实际发起付款。旧三种模式的输入输出与行为不变。批次、上一份结果与输出均为 UTF-8 JSON，沿用严格读取（重复键、非有限常量、超 8 MB 拒绝）、原子新建发布与不覆盖目标；输入、衔接或发布失败退出 2，不留下部分结果，不改动上一份结果。
+`pedal-performance --settlement BATCH --output RESULT` 首次出账；续批用 `pedal-performance --settlement BATCH --previous PREVIOUS_RESULT --output RESULT`。`--previous` 仅可用于本模式；五种模式互斥。一次结算服务同一素材项目，费用用整数分记账，不实际发起付款。旧三种模式的输入输出与行为不变。批次、上一份结果与输出均为 UTF-8 JSON，沿用严格读取（重复键、非有限常量、超 8 MB 拒绝）、原子新建发布与不覆盖目标；输入、衔接或发布失败退出 2，不留下部分结果，不改动上一份结果。
 
 ## 批次
 
@@ -99,3 +99,37 @@ score 无效、演奏无效或评估无法完成时整份报告不发布，退�
 `balances` 列出当前精确用量大于零的各供稿人，每行 `owner_id`、`usage_us`（精确的整数字符串或最简分数字符串）、`payable_cents`；应付总分等于各行 `payable_cents` 之和。`adjustments` 每行 `owner_id`、`previous_cents`、`payable_cents`、`delta_cents`，金额字段为整数，仅列非零差额。两个列表均按 `owner_id` 字典序升序。
 
 `checkpoint` 内部格式自定，输出可直接作为下一次的 `--previous`，不依赖旧路径、进程内缓存或外部服务，也不复制旧录次原始事件。它保存每个录次的版本、是否在账与其按供稿人的精确用量，以及已入账累计额和已接受批次的指纹，足以在旧事件文件离线后继续结算。
+
+# 按键版导出 v1（--key-only）
+
+`pedal-performance --key-only MANIFEST --output RESULT` 与 `--source`、`--comp`、`--capture-audit`、`--settlement` 互斥；旧四种模式的输入输出与行为不变。清单与结果均为 UTF-8 JSON，沿用严格读取（重复键、非有限常量、超 8 MB 拒绝）、原子新建发布与不覆盖目标；输入错误（包括设备不会用到的源通道上的错误）或发布失败退出 2 且不留下部分结果。设备放不下但输入本身合法时正常发布 `no_layout`（退出 0），不缩短尾音、不替换音色。本模式不接入真实设备。
+
+## 清单
+
+顶层恰含 `performance`、`channel_programs`、`lanes`。
+
+`performance` 是演奏 v1 的四个必填字段，不带 `score`，事件最多 4000 条。沿用原有 ppq、end_tick、tempos、事件范围、身份与非递减 tick 顺序校验，以及同 tick 输入顺序、同通道同音高 FIFO 释放、没有对应起音的 off 即输入错误的因果规则。声部的实际发声区间 `[start_tick, sound_end_tick)` 沿用演奏 v1：松键后踏板延音照样计入，仍未止音的按录次结尾止音；零时长声部（起音 tick 等于实际止音 tick）无需播放但登记其 ID。
+
+`channel_programs` 为 0..16 项，每项恰含 `channel`（0..15 整数，表内不重复）与 `program_id`（音色标识）。允许多个源通道指定同一音色，允许为无起音通道指定音色。所有有 on 事件的源通道都必须有映射，包括只产生零时长音的通道；缺映射是输入错误。
+
+`lanes` 为 1..12 项，每项恰含 `lane`（0..15 整数，表内不重复，输出时用作通道号）与 `program_costs`（1..8 项）。`program_costs` 每项恰含 `program_id` 与 `load_cost`（1..1,000,000 整数）；同一轨中音色不得重复，未列出的音色不能装到该轨。未装载的轨不收费。音色映射与设备表中列出的音色 ID 合计最多 8 个不同值。两个表与各轨 `program_costs` 的排列都没有业务意义。音色 ID 沿用标识符格式。
+
+## 发声保留与设备规划
+
+每个源声部的实际发声区间必须完整使用一条轨：不许中途换轨、不许拆音。该轨的音色必须是源通道指定的音色。不同源通道若映射到同一音色，可以共用轨，但其同音高的发声区间在该轨上不能重叠（前一声部恰在后一声部起音时止音不算重叠）。不同音高不争用轨。设备规划针对整份录次：一条轨在开播前装载一次音色，此后即使整条轨已静音也不能改装去承接后一段的另一音色。
+
+某音色的 `min_lanes`（忽略设备表）是按上述键位规则、把所有映射到该音色的源通道合并考虑时，其同音高发声区间至少需要多少条轨；不同音高的重叠不抬高该数。这是单音色的独立需求，不保证整份设备表可行。
+
+设备规划先要求每种有正时长声部的音色获得恰好 `min_lanes` 条轨（多给只会增加正代价且不会解锁任何可行编排），可装载该音色的轨各自只能装一种音色。在所有能完整导出的配置中选总装载代价最小者，每个已装载轨只算一次；代价相同时，把输入轨按轨号升序排列，比较对应 `program_id` 序列的字典序，取最小者，未装载视为大于任何音色 ID。配置确定后，把正时长源声部按（起音 tick、源声部 ID）排列，在所有符合该配置的完整编排中取轨号序列字典序最小者。不得靠提前截断声部或合并同音来降低成本。
+
+## 结果
+
+输出恰含 `status`、`demands`、`omitted_zero_voice_ids`、`configuration`、`total_load_cost`、`voice_routes`、`performance`。
+
+`status` 为 `ok` 或 `no_layout`。`demands` 为每个有正时长声部的音色一行，含 `program_id` 与 `min_lanes`，按音色 ID 升序。`omitted_zero_voice_ids` 列出零时长源声部 ID，按 ID 升序。
+
+有解时 `status` 为 `ok`：`configuration` 按轨号升序列出全部输入轨，每行含 `lane` 与 `program_id`（未装载为 null）；`total_load_cost` 为该配置总装载代价；`voice_routes` 按编排的声部顺序，每行含 `source_voice_id`、`lane`、`on_event_id`、`off_event_id`。没有正时长声部时仍可成功导出，全部轨未装载、代价为零、编排为空。
+
+有解时 `performance` 是可直接作为旧 `--source` 的四字段演奏，原样保留 `ppq`、`end_tick` 与速度图。每条编排记录对应唯一一对生成的 on/off：on 用原音高和力度、在原起音 tick 发出，off 在原实际止音 tick 发出，二者都走编排指定的轨；不输出踏板事件。生成的 ID 稳定且符合原格式。同 tick 的 off 一律在 on 之前，同类按轨号、音高、源声部 ID 升序，使同一键能在止音点立即重新起音。用旧命令重放并经编排表逐一回查时，发声音高、力度、起音 tick 与实际止音 tick 须与原声部精确相符；不要求保留原松键 tick 或止音原因。
+
+合法但无法完整编排时 `status` 为 `no_layout`，保留 `demands` 与零时长记录，其余四个交付字段 `configuration`、`total_load_cost`、`voice_routes`、`performance` 均为 null，退出 0。

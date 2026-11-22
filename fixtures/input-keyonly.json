@@ -1,0 +1,29 @@
+{
+  "performance": {
+    "ppq": 1,
+    "end_tick": 20,
+    "tempos": [{"tick": 0, "microseconds_per_quarter": 1000000}],
+    "events": [
+      {"id": "a-on", "tick": 0, "channel": 0, "kind": "on", "pitch": 60, "velocity": 80},
+      {"id": "pedal-down", "tick": 1, "channel": 0, "kind": "pedal", "down": true},
+      {"id": "a-off", "tick": 2, "channel": 0, "kind": "off", "pitch": 60},
+      {"id": "b-on", "tick": 4, "channel": 0, "kind": "on", "pitch": 60, "velocity": 70},
+      {"id": "b-off", "tick": 6, "channel": 0, "kind": "off", "pitch": 60},
+      {"id": "pedal-up", "tick": 7, "channel": 0, "kind": "pedal", "down": false},
+      {"id": "q-on", "tick": 9, "channel": 1, "kind": "on", "pitch": 64, "velocity": 90},
+      {"id": "q-off", "tick": 10, "channel": 1, "kind": "off", "pitch": 64}
+    ]
+  },
+  "channel_programs": [
+    {"channel": 0, "program_id": "P"},
+    {"channel": 1, "program_id": "Q"}
+  ],
+  "lanes": [
+    {"lane": 0, "program_costs": [
+      {"program_id": "Q", "load_cost": 2},
+      {"program_id": "P", "load_cost": 1}
+    ]},
+    {"lane": 1, "program_costs": [{"program_id": "P", "load_cost": 3}]},
+    {"lane": 2, "program_costs": [{"program_id": "P", "load_cost": 4}]}
+  ]
+}
