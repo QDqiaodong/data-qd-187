@@ -21,7 +21,7 @@ uv pip check --python .venv/bin/python
 .venv/bin/pedal-performance --comp fixtures/input-comp.json --output run/report-comp.json
 ```
 
-实际73项测试通过；CLI演示生成JSON，摘要为：
+实际98项测试通过；CLI演示生成JSON，摘要为：
 
 ```json
 {
@@ -81,6 +81,23 @@ uv pip check --python .venv/bin/python
 - `inconsistent`：至少一个通道没有可行解释；诊断照常发布，其他通道证据不丢失，`performance`、`report` 为 null。
 
 每个备选的 `flips` 是能重现该五元组且满足本通道全部观测的最小见证（被翻转对在原事件数组中的从 0 开始编号，空数组表示原顺序即可）。清单的结构、类型、身份、边界错误退出 2；无可行解释是审计结果而非输入错误。字段与规则细节见契约。
+
+## 离线用量结算
+
+`--settlement BATCH --output RESULT` 按录次给音轨供稿人结算发声费。首批出账；续批加 `--previous PREVIOUS_RESULT`，只开相对已入账结果的差额。`--previous` 仅可用于本模式，与其余三种模式互斥。
+
+对一份录次的每个声部按其自身速度图精确积分半开区间的发声时长；同一时刻多位供稿人发声则平分，同一人多个声部或通道仍只占一份。音量、按键时长与峰值复音都不参与计费。所有录次的精确用量先按供稿人求和，再对整个项目做一次整数分下取整与尾分分配，绝不按录次分别舍入。批次用 `upsert` 整份替换一个录次的演奏与通道归属，用 `withdraw` 撤下仍在该录次（保留身份，可后续恢复）。同一 `batch_id` 相同内容重放返回 `replayed` 且不再入账，不同内容冲突。`checkpoint` 保存派生用量与已入账累计额，使旧事件文件离线归档后仍能继续结算。
+
+演示（费率每秒一分）：
+
+```sh
+.venv/bin/pedal-performance --settlement fixtures/settlement-batch-1.json \
+  --output run/settle-1.json
+.venv/bin/pedal-performance --settlement fixtures/settlement-batch-2.json \
+  --previous run/settle-1.json --output run/settle-2.json
+```
+
+首批用量为 `a` 0.5 秒、`b` 0.75 秒、`c` 0.25 秒，项目只有一分归 `b`；第二批只提交录次甲的新版本（`b` 在 0.5 秒止音），项目精确总额不变但三人小数余数相同，唯一一分改归 `a`，差额为 `b` -1、`a` +1。字段、边界与衔接规则见契约。
 
 ## 当前边界
 

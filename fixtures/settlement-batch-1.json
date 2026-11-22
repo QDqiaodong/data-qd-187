@@ -1,0 +1,44 @@
+{
+  "project_id": "album",
+  "batch_id": "take-round-1",
+  "base_batch_id": null,
+  "cents_per_second": 1,
+  "changes": [
+    {
+      "op": "upsert",
+      "recording_id": "take-a",
+      "revision": 1,
+      "performance": {
+        "ppq": 2,
+        "end_tick": 2,
+        "tempos": [{"tick": 0, "microseconds_per_quarter": 1000000}],
+        "events": [
+          {"id": "b", "tick": 0, "channel": 0, "kind": "on", "pitch": 60, "velocity": 90},
+          {"id": "b_pedal", "tick": 0, "channel": 0, "kind": "pedal", "down": true},
+          {"id": "b_off", "tick": 1, "channel": 0, "kind": "off", "pitch": 60},
+          {"id": "c", "tick": 1, "channel": 1, "kind": "on", "pitch": 64, "velocity": 80}
+        ]
+      },
+      "channel_owners": [
+        {"channel": 0, "owner_id": "b"},
+        {"channel": 1, "owner_id": "c"}
+      ]
+    },
+    {
+      "op": "upsert",
+      "recording_id": "take-b",
+      "revision": 1,
+      "performance": {
+        "ppq": 2,
+        "end_tick": 1,
+        "tempos": [{"tick": 0, "microseconds_per_quarter": 1000000}],
+        "events": [
+          {"id": "a", "tick": 0, "channel": 0, "kind": "on", "pitch": 67, "velocity": 70}
+        ]
+      },
+      "channel_owners": [
+        {"channel": 0, "owner_id": "a"}
+      ]
+    }
+  ]
+}

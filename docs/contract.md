@@ -56,3 +56,46 @@ score 无效、演奏无效或评估无法完成时整份报告不发布，退�
 
 任一通道不可行时 `status` 为 `inconsistent`；否则只要任一声部有不止一个备选，`status` 为 `ambiguous`。这两种状态正常发布审计 JSON，但 `performance`、`report` 均为 null，不交付猜测的播放版本。若每通道可行且每个声部的五元组证据都唯一，`status` 为 `certified`，即使仍有多个合法事件次序也允许发布：取所有对上按编号比较、保留早于翻转的最小合法整份翻转选择，用它重排事件后输出完整 `performance`，并给出旧 `--source` 处理它得到的完整 `report`。证据唯一性按声部 ID 判断，不因同 tick 两条起音在旧报告中的展示位置不同而改变。
 
+
+# 离线用量结算 v1（--settlement）
+
+`pedal-performance --settlement BATCH --output RESULT` 首次出账；续批用 `pedal-performance --settlement BATCH --previous PREVIOUS_RESULT --output RESULT`。`--previous` 仅可用于本模式；四种模式互斥。一次结算服务同一素材项目，费用用整数分记账，不实际发起付款。旧三种模式的输入输出与行为不变。批次、上一份结果与输出均为 UTF-8 JSON，沿用严格读取（重复键、非有限常量、超 8 MB 拒绝）、原子新建发布与不覆盖目标；输入、衔接或发布失败退出 2，不留下部分结果，不改动上一份结果。
+
+## 批次
+
+批次顶层恰含 `project_id`、`batch_id`、`base_batch_id`、`cents_per_second`、`changes`。`project_id`、`batch_id`、`base_batch_id`（非 null 时）、`recording_id`、`owner_id` 均沿用 1..64 位标识符格式；`base_batch_id` 另可为 null。`cents_per_second` 为 1..1000000 的整数分/秒，在项目首次出账后固定。
+
+`changes` 是 1..32 条变更，同一录次在一个批次至多出现一次：
+
+- `upsert` 恰含 `op`（`upsert`）、`recording_id`、`revision`、`performance`、`channel_owners`。`performance` 使用演奏 v1 的四个必填字段、不带 `score`，至多 2000 条事件；同 tick 顺序有意义，沿用旧版范围、身份与因果校验（无法匹配的 off 使整批无效）。不同录次之间的演奏事件 ID 可以相同。`channel_owners` 是 0..16 项数组，每项恰含 `channel`（0..15，同一表内不重复）、`owner_id`。同一供稿人可管多个通道；所有有起音事件的通道都必须有归属，允许为无起音通道指定归属。每次 upsert 整份替换该录次演奏及其通道归属，不与上一版合并。
+- `withdraw` 恰含 `op`（`withdraw`）、`recording_id`、`revision`。只有当前仍在账的录次可撤回。撤回删除其用量，但保留录次身份和版本号。
+
+新录次只可用版本 1 upsert；任何已见录次的下一次变更版本号必须恰好加 1，包括撤回后恢复。版本号是 1..256 的整数。项目最多登记过 32 个不同录次 ID（含已撤回的），最多接受 256 个不同批次。
+
+## 用量
+
+从每个声部的起音到实际止音计费，使用半开区间：松键后的踏板延音照计，未提前止音（`end_of_take`）的声部按录次结尾止音，零时长不计。用该录次自己的速度图与 ppq 换算精确微秒，不用按键时长，也不用峰值复音。对一份录次的任一段正时长，若同时有 k 位不同供稿人发声，每位分得该段时长的 1/k；同一人叠了多个声部或通道仍只占一份。静音不计。录次各算各的，从不同录次分得的时长按供稿人求和；不同录次都从 tick 0 起，不共享播放时间轴。全程使用精确 `Fraction` 微秒，中途不舍入。
+
+## 从用量到入账
+
+对变更后的**整个项目**计算每人当前应付目标：各供稿人的精确用量乘 `cents_per_second` 并换算成分（`usage_us * rate / 1000000`）。先给每人下取整；项目应付总分是所有人精确金额之和下取整。差出的整数分依次给小数余数较大的供稿人，同余数按 `owner_id` 字典序升序，每人至多补一分。不按录次分别取整。
+
+每人的本批差额是当前应付目标减去前批已入账累计额（初次为零）。已无用量的人当前目标为零。只列非零差额，允许负数冲减；即使某人所有录次都没变，项目内尾分重新分配也可能使其需要入账。
+
+## 批次衔接与交付
+
+没有上一份结果时，只接受 `base_batch_id: null` 的首批；有上一份结果时，`project_id` 与 `cents_per_second` 必须与它一致，且 `base_batch_id` 必须等于上一份结果的 `head_batch_id`。
+
+上一份结果由本模式生成且不得修改。续算前校验其 `schema_version`、必填字段、`checkpoint` 结构、身份，以及 `checkpoint` 与顶层 `balances`/`total_cents`/`adjustments` 的一致性；拒绝不能用于续算的结果。不要求数字签名或跨文件分支协调。
+
+已接受过的 `batch_id` 优先按重放处理：相同内容返回 `replayed`、差额为空，当前结算结果、批次记录和最新批次不回退。相同 ID 不同内容是冲突（退出 2）。比较内容时忽略 JSON 对象键顺序、`changes` 的排列与 `channel_owners` 的排列，仍保留同 tick 事件次序等演奏数组的原有语义，并包含原 `base_batch_id`。允许重放非最新的已接受批次，不因它的原基准落后或录次版本已变而重入账或报基准过期。新 ID 使用过期基准则拒绝。
+
+变更先整体校验再对外发布，任一变更非法就不产出差额或新状态。合规的新批次即使没有非零差额也作为 `applied` 登记。
+
+## 结果
+
+结果至少含 `schema_version`（1）、`status`（`applied` 或 `replayed`）、`project_id`、`batch_id`（本次请求）、`head_batch_id`（当前最新）、`cents_per_second`、`total_cents`、`balances`、`adjustments`、`checkpoint`。
+
+`balances` 列出当前精确用量大于零的各供稿人，每行 `owner_id`、`usage_us`（精确的整数字符串或最简分数字符串）、`payable_cents`；应付总分等于各行 `payable_cents` 之和。`adjustments` 每行 `owner_id`、`previous_cents`、`payable_cents`、`delta_cents`，金额字段为整数，仅列非零差额。两个列表均按 `owner_id` 字典序升序。
+
+`checkpoint` 内部格式自定，输出可直接作为下一次的 `--previous`，不依赖旧路径、进程内缓存或外部服务，也不复制旧录次原始事件。它保存每个录次的版本、是否在账与其按供稿人的精确用量，以及已入账累计额和已接受批次的指纹，足以在旧事件文件离线后继续结算。
