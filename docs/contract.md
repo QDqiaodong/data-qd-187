@@ -133,3 +133,23 @@ score 无效、演奏无效或评估无法完成时整份报告不发布，退�
 有解时 `performance` 是可直接作为旧 `--source` 的四字段演奏，原样保留 `ppq`、`end_tick` 与速度图。每条编排记录对应唯一一对生成的 on/off：on 用原音高和力度、在原起音 tick 发出，off 在原实际止音 tick 发出，二者都走编排指定的轨；不输出踏板事件。生成的 ID 稳定且符合原格式。同 tick 的 off 一律在 on 之前，同类按轨号、音高、源声部 ID 升序，使同一键能在止音点立即重新起音。用旧命令重放并经编排表逐一回查时，发声音高、力度、起音 tick 与实际止音 tick 须与原声部精确相符；不要求保留原松键 tick 或止音原因。
 
 合法但无法完整编排时 `status` 为 `no_layout`，保留 `demands` 与零时长记录，其余四个交付字段 `configuration`、`total_load_cost`、`voice_routes`、`performance` 均为 null，退出 0。
+
+# 证据归档 v1（--archive-build）
+
+`pedal-performance --archive-build SOURCE --output ARCHIVE` 与 `--source`、`--comp`、`--capture-audit`、`--settlement`、`--key-only`、`--archive-query` 互斥，旧五种模式的输入输出与行为不变。`SOURCE` 是旧版四字段单录次 JSON（不带 `score`），沿用同一 `ppq`、`end_tick`、速度图与事件上限、事件范围、身份、非递减 tick、同 tick 输入顺序、同通道同音高 FIFO 松键、踏板与期末止音语义；任何结构或因果错误使归档失败并退出 2，不发布任何文件。
+
+归档是自包含、可复制的**单文件二进制包**，无旁车文件，单包不得超过 8,000,000 字节。任何合法录次都必须可归档。格式版本为 1，文件以魔数 `PPARCH01` 与 16 位小端版本号开头，随后依次是固定长度头部、每 32 个声部一条的块目录、按查询顺序排列的定长声部记录与字符串表；各段偏移与长度记在头部，读取端按这些偏移定位。档案身份为规范化录次内容的 SHA-256：忽略 JSON 对象键顺序，但保留事件数组顺序（同 tick 次序有业务含义），不含路径。同一录次重新构建得到字节一致、身份一致的包。头部字段（小端）：魔数、版本、头部长度、32 字节身份、精确总时长的分子与分母、声部数、块大小 32、块数、字符串表偏移与长度、目录偏移、记录步长、记录偏移、文件总长；目录每条含块首声部下标、块内声部数、块内最小起音与最大止音的分子分母；记录含 tick、精确时间的有理数与字符串引用。查询只依赖头部与所访问的目录/记录，不要求校验未访问内容。
+
+归档须提供旧 `--source` 中每条声部的完整证据：`voice_id`、`channel`、`pitch`、`velocity`、`start_tick`、`key_release_tick`、`release_event_id`、`sound_end_tick`、`end_reason`、`end_event_id`，以及精确的 `start_us`、`key_release_us`、`sound_end_us`、`sound_duration_us`。时间统一为非负整数或最简分数字符串微秒，`key_release_tick`/`release_event_id` 在未松键时为 null，`end_reason` 取 `key_release`、`pedal_release` 或 `end_of_take`。归档从不保存原始事件流，查询也不重放原事件。
+
+# 时间窗查询 v1（--archive-query）
+
+`pedal-performance --archive-query REQUEST --archive ARCHIVE --output RESULT` 与其余模式互斥，`--archive` 只在查询时使用且此时必填；无 `--archive-query` 时给出 `--archive` 是输入错误。`REQUEST`、结果均为严格 JSON（重复键、非有限常量拒绝）；请求是普通对象，无须超过 8 MB。请求恰含 `from_us`、`to_us`、`limit`，可省略 `cursor`。`from_us`、`to_us` 为非负整数字符串或最简分数字符串（分母大于一，分子与分母各至多 30 位十进制数字，不带前导零），满足 `0 ≤ from_us < to_us ≤` 录次精确总时长；`limit` 为 1..100 的整数；`cursor` 省略或为 null 时从头取页，否则为上一页发出的非空字符串。
+
+声部实际发声区间为半开 `[start_us, sound_end_us)`；只收录与查询半开窗口有正时长交集的声部，不返回零时长声部。筛选、裁边与显示时长全用精确 `Fraction`，不按整数微秒舍入。按原始 `(start_tick, voice_id)` 升序排列，先筛选再分页；翻页既不跳过窗口开始前起音、窗口里仍响着的声部，也不重复它。剪裁只体现在 `visible_from_us`、`visible_to_us`、`visible_duration_us`；`voice` 保留原始起音、松键、止音 tick 与精确时间，即使窗口右端早于真实止音，仍保留真实止音原因与事件 ID。
+
+结果为顶层恰含 `schema_version`（1）、`archive_id`、`from_us`、`to_us`、`items`、`next_cursor` 的 JSON；时间字段统一为精确整数字符串或最简分数字符串。每项含 `voice`（等同旧报告该声部对象）、`visible_from_us`、`visible_to_us`、`visible_duration_us`。仅在同一窗口仍有下一项时给出非空 `next_cursor`，否则为 null；无命中返回空 `items` 与 null 游标。游标绑定归档身份、窗口两端和已取位置，允许改变页大小；换录次或改窗口时旧游标报错，不悄悄从头开始；不要求防伪。
+
+阅览端与 CLI 共用 `pedal_performance.archive.query_archive(read_at, archive_size, request)`。`read_at(offset, length)` 返回该范围的原始 bytes，调用方告知文件长度。查询只通过这个接口读归档，每次请求都能用新进程完成，不依赖先前整包缓存；请求不得越过包边界。查询仅检查版本与所读取结构及其引用是否合法，不为检查未访问内容先扫全包；被访问的数据缺失或截短须失败，不得当成无命中。查询只从已归档证据回答，不在查询时解码整包声部表后扫描，也不重放原事件。
+
+沿用既有严格 JSON 规则；输入、游标、读取或发布失败退出 2，不改动输入、不留下部分结果。两个新命令的目标都原子新建、不覆盖。原有命令及行为不变，不需要联网、音频设备或第三方运行时依赖。

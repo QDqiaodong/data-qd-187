@@ -24,6 +24,11 @@ def load(path):
 
 def publish(path, result):
     payload = (json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + '\n').encode('utf-8')
+    publish_bytes(path, payload)
+
+
+def publish_bytes(path, payload):
+    """Atomically create ``path`` with raw bytes; never overwrite."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = None

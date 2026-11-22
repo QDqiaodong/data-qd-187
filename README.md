@@ -19,9 +19,11 @@ uv pip check --python .venv/bin/python
 .venv/bin/pedal-performance --source fixtures/input.json --output run/report-initial.json
 .venv/bin/pedal-performance --source fixtures/input-score.json --output run/report-score.json
 .venv/bin/pedal-performance --comp fixtures/input-comp.json --output run/report-comp.json
+.venv/bin/pedal-performance --archive-build fixtures/input.json --output run/take.pparch
+.venv/bin/pedal-performance --archive-query fixtures/query.json --archive run/take.pparch --output run/page.json
 ```
 
-实际123项测试通过；CLI演示生成JSON，摘要为：
+实际151项测试通过；CLI演示生成JSON，摘要为：
 
 ```json
 {
@@ -116,6 +118,16 @@ uv pip check --python .venv/bin/python
   "voices": 3
 }
 ```
+
+## 证据归档与时间窗查询
+
+原始录次随后会移到冷存储，阅览端只读取一个离线证据包，并按字节区间慢速取数。`--archive-build SOURCE --output ARCHIVE` 把旧版四字段录次（不带乐谱，沿用同一事件上限、速度图上限、同 tick 输入顺序、同键 FIFO、踏板与期末止音语义）归档为一个自包含、可复制的单文件；全部录次与因果校验通过后才原子新建，单包不超过 8,000,000 字节，无旁车文件，查询也不再需要原录次路径。
+
+`--archive-query REQUEST --archive ARCHIVE --output RESULT` 回答一个半开窗口 `[from_us, to_us)`：`REQUEST` 恰含 `from_us`、`to_us`、`limit`，可省略 `cursor`。时间是非负整数字符串或最简分数字符串，`0 ≤ from_us < to_us ≤` 录次精确总时长；`limit` 为 1..100。结果按原始 `(start_tick, voice_id)` 升序分页，只收录与窗口有正时长交集的声部；`items` 每项含 `voice`（与旧报告的声部对象等同，含原始起音/松键/止音 tick 与精确时间、止音原因与关联事件 ID）、`visible_from_us`、`visible_to_us`、`visible_duration_us`，剪裁只影响后三者。`next_cursor` 只在同一窗口仍有下一项时给出，绑定归档身份与窗口两端；换录次或改窗口时旧游标报错而非重头开始。
+
+阅览端与 CLI 共用 `pedal_performance.archive.query_archive(read_at, archive_size, request)`：`read_at(offset, length)` 返回该范围原始字节，查询只经此接口取数，每次请求都可由独立进程完成，不缓存整包、不重放原事件、不扫描整包声部表。归档文件带版本与内容身份（对象键顺序无关，事件数组的同 tick 顺序参与身份）。查询失败（非法请求或游标、读取截短、跨包边界）退出 2，不发布部分结果；已有归档与结果均不覆盖。格式、字段与规则细节见契约。
+
+演示 `fixtures/input.json` 归档后约 356 字节；查询 `[0, 2500000)` 每页两条时首条为 0 起音、1500000 微秒实际发声的声部。
 
 ## 当前边界
 
