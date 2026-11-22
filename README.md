@@ -21,7 +21,7 @@ uv pip check --python .venv/bin/python
 .venv/bin/pedal-performance --comp fixtures/input-comp.json --output run/report-comp.json
 ```
 
-实际52项测试通过；CLI演示生成JSON，摘要为：
+实际73项测试通过；CLI演示生成JSON，摘要为：
 
 ```json
 {
@@ -69,6 +69,18 @@ uv pip check --python .venv/bin/python
 ## 乐谱提示评估
 
 可选 `score` 给出 cues；每个 cue 按 channel/pitch 与声部做保序一对一归因，报告起音偏差/状态、按键时值偏差/状态、漏奏与多奏。归因依次最大化匹配数、最小化起音绝对偏差总和、最小化可观测按键时值绝对偏差总和，再取配对序列字典序最小者。两套 ppq/速度图各自积分，比较全程用整数缩放后的精确值。未释放按键的时值标为不可判定，不以踏板延音或 end_tick 强停冒充释放。字段与边界见契约。
+
+## 录制顺序核验
+
+录音器偶尔会把同一 tick 上相邻两条消息写反并在导出时标记这对消息，还能独立记录某些拍点上各通道仍按着的键数（`held`）与已松键但仍在发声的声部数（`sustained`）。`--capture-audit MANIFEST` 与 `--source`、`--comp` 三选一：清单顶层恰含 `performance`（四个必填字段、不带乐谱、至多 2000 条事件）、`races`（相邻、同 tick、同通道的可互换事件对，每通道至多六对）、`checkpoints`（至多 2000 项，输入无需排序）。
+
+核验会枚举每对的保留/互换选择并按通道独立重放：解释必须走完整段录制、满足同音高 FIFO 与踏板语义、没有无对应按键的 off，并符合沿途全部检查点计数；局部前缀能重放不构成证据。输出 `status`、`channels`、`performance`、`report`：
+
+- `certified`：每通道可行且每个声部的释放/止音五元组证据唯一。取所有对上最小的合法翻转选择重排事件，输出可直接回放的完整 `performance` 与旧 `--source` 完整 `report`；即使仍有多个合法事件次序，只要证据唯一就允许发布。
+- `ambiguous`：所有通道都可行，但至少一个声部存在多个各带可重放见证的备选；`performance`、`report` 为 null，不交付猜测的播放版本。
+- `inconsistent`：至少一个通道没有可行解释；诊断照常发布，其他通道证据不丢失，`performance`、`report` 为 null。
+
+每个备选的 `flips` 是能重现该五元组且满足本通道全部观测的最小见证（被翻转对在原事件数组中的从 0 开始编号，空数组表示原顺序即可）。清单的结构、类型、身份、边界错误退出 2；无可行解释是审计结果而非输入错误。字段与规则细节见契约。
 
 ## 当前边界
 

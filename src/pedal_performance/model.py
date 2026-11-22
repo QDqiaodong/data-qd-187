@@ -21,8 +21,8 @@ def _tempos(value, end):
     return tempos
 
 
-def _events(value, end):
-    events = array(value, 0, 10000)
+def _events(value, end, max_events=10000):
+    events = array(value, 0, max_events)
     previous = -1
     for event in events:
         if not isinstance(event, dict):
@@ -76,12 +76,13 @@ def _score(score):
     return score
 
 
-def validate(data):
-    fields(data, ('ppq', 'end_tick', 'tempos', 'events'), optional=('score',))
+def validate(data, max_events=10000, allow_score=True):
+    fields(data, ('ppq', 'end_tick', 'tempos', 'events'),
+           optional=('score',) if allow_score else ())
     integer(data['ppq'], 1, 9600)
     end = integer(data['end_tick'], 1, 10000000)
     _tempos(data['tempos'], end)
-    _events(data['events'], end)
-    if 'score' in data:
+    _events(data['events'], end, max_events)
+    if allow_score and 'score' in data:
         _score(data['score'])
     return data

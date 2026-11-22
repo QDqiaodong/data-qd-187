@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+from .audit import audit_capture
 from .comp import compose
 from .io import load, publish
 from .service import process
@@ -10,10 +11,14 @@ def main(argv=None):
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument('--source')
     modes.add_argument('--comp')
+    modes.add_argument('--capture-audit')
     parser.add_argument('--output', required=True)
     args = parser.parse_args(argv)
     try:
-        if args.comp is not None:
+        if args.capture_audit is not None:
+            result = audit_capture(load(args.capture_audit))
+            summary = {'status': result['status'], 'channels': len(result['channels'])}
+        elif args.comp is not None:
             result = compose(load(args.comp))
             summary = {'status': result['status']}
             if result['plan'] is not None:
